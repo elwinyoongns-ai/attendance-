@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold mb-0"><i class="bi bi-bar-chart me-2 text-primary"></i>Attendance Reports</h2>
+</div>
+
+<div class="row g-4">
+  <!-- Service attendance chart -->
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white">
+        <h5 class="mb-0 fw-semibold"><i class="bi bi-graph-up me-2 text-muted"></i>Recent Services</h5>
+      </div>
+      <div class="card-body">
+        {% if service_stats %}
+        <div class="chart-bars">
+          {% for s in service_stats %}
+          {% set pct = ((s.present / s.total * 100) | int) if s.total > 0 else 0 %}
+          <div class="chart-bar-row mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="small fw-semibold text-truncate me-2" style="max-width:200px" title="{{ s.name }}">{{ s.name }}</span>
+              <span class="text-muted small">{{ s.present }}/{{ s.total }} ({{ pct }}%)</span>
+            </div>
+            <div class="progress" style="height:12px;border-radius:6px">
+              <div class="progress-bar {% if pct >= 70 %}bg-success{% elif pct >= 40 %}bg-warning{% else %}bg-danger{% endif %} rounded"
+                   style="width:{{ pct }}%"></div>
+            </div>
+            <div class="text-muted" style="font-size:0.7rem">{{ s.date }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">No service data yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Member leaderboard -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white">
+        <h5 class="mb-0 fw-semibold"><i class="bi bi-trophy me-2 text-muted"></i>Member Attendance</h5>
+      </div>
+      <div class="card-body p-0">
+        {% if member_stats %}
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>Member</th>
+                <th>Present</th>
+                <th>Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in member_stats %}
+              <tr>
+                <td class="text-muted small">{{ loop.index }}</td>
+                <td>
+                  <a href="{{ url_for('member_detail', member_id=s.member.id) }}" class="text-decoration-none fw-semibold small text-dark">
+                    {{ s.member.full_name }}
+                  </a>
+                  {% if s.member.group %}
+                  <div class="text-muted" style="font-size:.7rem">{{ s.member.group }}</div>
+                  {% endif %}
+                </td>
+                <td class="small text-muted">{{ s.present }}/{{ s.total }}</td>
+                <td style="min-width:100px">
+                  <div class="d-flex align-items-center gap-1">
+                    <div class="progress flex-grow-1" style="height:6px">
+                      <div class="progress-bar {% if s.rate >= 70 %}bg-success{% elif s.rate >= 40 %}bg-warning{% else %}bg-danger{% endif %}"
+                           style="width:{{ s.rate }}%"></div>
+                    </div>
+                    <span class="small">{{ s.rate }}%</span>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">No member data yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="mt-4 d-flex gap-3 small text-muted">
+  <span><span class="badge bg-success">&nbsp;</span> ≥70% attendance</span>
+  <span><span class="badge bg-warning">&nbsp;</span> 40–69%</span>
+  <span><span class="badge bg-danger">&nbsp;</span> &lt;40%</span>
+</div>
+{% endblock %}

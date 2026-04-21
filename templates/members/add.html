@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Add Member{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-6">
+    <div class="d-flex align-items-center mb-4">
+      <a href="{{ url_for('members_list') }}" class="btn btn-sm btn-outline-secondary me-3"><i class="bi bi-arrow-left"></i></a>
+      <h2 class="fw-bold mb-0"><i class="bi bi-person-plus me-2 text-primary"></i>Add Member</h2>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <form method="post">
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold">First Name <span class="text-danger">*</span></label>
+              <input type="text" name="first_name" class="form-control" required autofocus>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold">Last Name <span class="text-danger">*</span></label>
+              <input type="text" name="last_name" class="form-control" required>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold">Phone</label>
+              <input type="tel" name="phone" class="form-control" placeholder="+1 555 000 0000">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold">Email</label>
+              <input type="email" name="email" class="form-control" placeholder="name@example.com">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold">Group / Cell</label>
+              <input type="text" name="group" class="form-control" placeholder="e.g. Youth, Choir, Cell A">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold">Date Joined</label>
+              <input type="date" name="joined_date" class="form-control" value="{{ now.date().isoformat() }}">
+            </div>
+            <div class="col-12 pt-2">
+              <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-check-lg me-1"></i>Save Member
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

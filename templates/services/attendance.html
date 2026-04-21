@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Attendance – {{ service.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <a href="{{ url_for('services_list') }}" class="btn btn-sm btn-outline-secondary me-3"><i class="bi bi-arrow-left"></i></a>
+  <div>
+    <h2 class="fw-bold mb-0">{{ service.name }}</h2>
+    <small class="text-muted">
+      {{ service.service_type }} &bull; {{ service.date.strftime('%A, %B %d, %Y') }}
+    </small>
+  </div>
+</div>
+
+<!-- Quick stats bar -->
+<div class="row g-3 mb-4" id="statsBar">
+  <div class="col-auto">
+    <div class="card border-0 bg-success text-white px-3 py-2">
+      <div class="fw-bold fs-4" id="presentCount">{{ records | selectattr('present') | list | length }}</div>
+      <div class="small opacity-75">Present</div>
+    </div>
+  </div>
+  <div class="col-auto">
+    <div class="card border-0 bg-danger text-white px-3 py-2">
+      <div class="fw-bold fs-4" id="absentCount">{{ records | rejectattr('present') | list | length }}</div>
+      <div class="small opacity-75">Absent</div>
+    </div>
+  </div>
+  <div class="col-auto">
+    <div class="card border-0 bg-secondary text-white px-3 py-2">
+      <div class="fw-bold fs-4">{{ records | length }}</div>
+      <div class="small opacity-75">Total</div>
+    </div>
+  </div>
+  <div class="col-md-4 ms-auto d-flex align-items-center">
+    <input type="text" id="searchBox" class="form-control" placeholder="Filter members…">
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <div class="fw-semibold"><i class="bi bi-person-check me-2 text-muted"></i>Mark Attendance</div>
+    <div class="btn-group btn-group-sm">
+      <button type="button" class="btn btn-outline-success" onclick="markAll(true)">Mark All Present</button>
+      <button type="button" class="btn btn-outline-danger" onclick="markAll(false)">Mark All Absent</button>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <form method="post" id="attendanceForm">
+      {% if records %}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle" id="memberTable">
+          <thead class="table-light">
+            <tr>
+              <th style="width:50px">
+                <input type="checkbox" class="form-check-input" id="selectAll">
+              </th>
+              <th>Member</th>
+              <th>Group</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in records %}
+            <tr class="member-row" data-name="{{ r.member.full_name | lower }}">
+              <td>
+                <input type="checkbox" class="form-check-input member-check"
+                       name="present" value="{{ r.member_id }}"
+                       {% if r.present %}checked{% endif %}>
+              </td>
+              <td class="fw-semibold">{{ r.member.full_name }}</td>
+              <td><span class="badge bg-secondary bg-opacity-10 text-secondary small">{{ r.member.group or '—' }}</span></td>
+              <td>
+                <span class="status-badge {% if r.present %}badge bg-success{% else %}badge bg-danger{% endif %}">
+                  {% if r.present %}Present{% else %}Absent{% endif %}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-people fs-1 d-block mb-2"></i>
+        No members found. <a href="{{ url_for('member_add') }}">Add members first.</a>
+      </div>
+      {% endif %}
+      <div class="p-3 border-top d-flex justify-content-end gap-2">
+        <a href="{{ url_for('services_list') }}" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary px-5">
+          <i class="bi bi-save me-1"></i>Save Attendance
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const checks = document.querySelectorAll('.member-check');
+const presentCount = document.getElementById('presentCount');
+const absentCount = document.getElementById('absentCount');
+const total = {{ records | length }};
+
+function updateCounts() {
+  const p = [...checks].filter(c => c.checked).length;
+  presentCount.textContent = p;
+  absentCount.textContent = total - p;
+}
+
+checks.forEach(cb => {
+  cb.addEventListener('change', function () {
+    const row = this.closest('tr');
+    const badge = row.querySelector('.status-badge');
+    if (this.checked) {
+      badge.className = 'status-badge badge bg-success';
+      badge.textContent = 'Present';
+    } else {
+      badge.className = 'status-badge badge bg-danger';
+      badge.textContent = 'Absent';
+    }
+    updateCounts();
+  });
+});
+
+function markAll(present) {
+  document.querySelectorAll('.member-row:not([style*="display: none"]) .member-check').forEach(cb => {
+    cb.checked = present;
+    cb.dispatchEvent(new Event('change'));
+  });
+}
+
+document.getElementById('selectAll').addEventListener('change', function () {
+  markAll(this.checked);
+});
+
+document.getElementById('searchBox').addEventListener('input', function () {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('.member-row').forEach(row => {
+    row.style.display = row.dataset.name.includes(q) ? '' : 'none';
+  });
+});
+</script>
+{% endblock %}

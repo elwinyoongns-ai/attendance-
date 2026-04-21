@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}{{ member.full_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <a href="{{ url_for('members_list') }}" class="btn btn-sm btn-outline-secondary me-3"><i class="bi bi-arrow-left"></i></a>
+  <h2 class="fw-bold mb-0"><i class="bi bi-person me-2 text-primary"></i>{{ member.full_name }}</h2>
+  <a href="{{ url_for('member_edit', member_id=member.id) }}" class="btn btn-outline-primary btn-sm ms-auto">
+    <i class="bi bi-pencil me-1"></i>Edit
+  </a>
+</div>
+
+<div class="row g-4">
+  <!-- Profile card -->
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body text-center pt-4">
+        <div class="avatar-circle bg-primary text-white mx-auto mb-3">
+          {{ member.first_name[0] }}{{ member.last_name[0] }}
+        </div>
+        <h5 class="fw-bold">{{ member.full_name }}</h5>
+        {% if member.group %}
+        <span class="badge bg-primary bg-opacity-10 text-primary mb-3">{{ member.group }}</span>
+        {% endif %}
+        <hr>
+        <ul class="list-unstyled text-start small">
+          {% if member.phone %}
+          <li class="mb-2"><i class="bi bi-telephone text-muted me-2"></i>{{ member.phone }}</li>
+          {% endif %}
+          {% if member.email %}
+          <li class="mb-2"><i class="bi bi-envelope text-muted me-2"></i>{{ member.email }}</li>
+          {% endif %}
+          {% if member.joined_date %}
+          <li class="mb-2"><i class="bi bi-calendar3 text-muted me-2"></i>Joined {{ member.joined_date.strftime('%B %d, %Y') }}</li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Attendance history -->
+  <div class="col-md-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white">
+        <h5 class="mb-0 fw-semibold"><i class="bi bi-clock-history me-2 text-muted"></i>Attendance History</h5>
+      </div>
+      <div class="card-body p-0">
+        {% if records %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Service</th>
+                <th>Type</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in records %}
+              <tr>
+                <td class="text-muted small">{{ r.service.date.strftime('%b %d, %Y') }}</td>
+                <td class="fw-semibold small">{{ r.service.name }}</td>
+                <td><span class="badge bg-secondary bg-opacity-10 text-secondary small">{{ r.service.service_type }}</span></td>
+                <td>
+                  {% if r.present %}
+                  <span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>Present</span>
+                  {% else %}
+                  <span class="badge bg-danger"><i class="bi bi-x-lg me-1"></i>Absent</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+          <i class="bi bi-calendar-x fs-2 d-block mb-2"></i>
+          No attendance records yet.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

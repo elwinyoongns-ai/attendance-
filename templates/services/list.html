@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Services{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold mb-0"><i class="bi bi-calendar-check me-2 text-primary"></i>Services</h2>
+  <a href="{{ url_for('service_add') }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>New Service
+  </a>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    {% if services %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Attendance</th>
+            <th>Rate</th>
+            <th>Notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in services %}
+          {% set pct = ((s.present_count() / s.total_count() * 100) | int) if s.total_count() > 0 else 0 %}
+          <tr>
+            <td class="text-muted small">{{ s.date.strftime('%b %d, %Y') }}</td>
+            <td class="fw-semibold">{{ s.name }}</td>
+            <td><span class="badge bg-primary bg-opacity-10 text-primary">{{ s.service_type }}</span></td>
+            <td>{{ s.present_count() }} / {{ s.total_count() }}</td>
+            <td style="min-width:130px">
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1" style="height:7px">
+                  <div class="progress-bar {% if pct >= 70 %}bg-success{% elif pct >= 40 %}bg-warning{% else %}bg-danger{% endif %}"
+                       style="width:{{ pct }}%"></div>
+                </div>
+                <span class="small">{{ pct }}%</span>
+              </div>
+            </td>
+            <td class="text-muted small">{{ s.notes or '—' }}</td>
+            <td>
+              <div class="btn-group btn-group-sm">
+                <a href="{{ url_for('service_attendance', service_id=s.id) }}" class="btn btn-outline-primary" title="Mark Attendance">
+                  <i class="bi bi-pencil-square"></i>
+                </a>
+                <form method="post" action="{{ url_for('service_delete', service_id=s.id) }}" class="d-inline"
+                      onsubmit="return confirm('Delete service &quot;{{ s.name }}&quot; and all its attendance records?')">
+                  <button type="submit" class="btn btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-calendar-x fs-1 d-block mb-2"></i>
+      No services yet. <a href="{{ url_for('service_add') }}">Create the first one.</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
