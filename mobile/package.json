@@ -8,7 +8,7 @@
     "ios": "expo start --ios"
   },
   "dependencies": {
-    "expo": "~53.0.0",
+    "expo": "~54.0.0",
     "@react-native-async-storage/async-storage": "*",
     "expo-status-bar": "*",
     "@react-navigation/native": "^6.1.18",
