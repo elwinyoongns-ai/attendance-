@@ -15,6 +15,6 @@
       "adaptiveIcon": { "backgroundColor": "#2563eb" },
       "package": "com.gracechurch.attendance"
     },
-    "plugins": [["expo-sqlite"]]
+    "plugins": []
   }
 }
