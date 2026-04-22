@@ -51,7 +51,7 @@ export default function DashboardScreen({ navigation }) {
 
       <View style={styles.statsRow}>
         <StatCard icon="people" value={stats.memberCount} label="Members" color={PRIMARY} />
-        <StatCard icon="calendar-check" value={stats.serviceCount} label="Services" color="#16a34a" />
+        <StatCard icon="calendar" value={stats.serviceCount} label="Services" color="#16a34a" />
       </View>
 
       <View style={styles.section}>
