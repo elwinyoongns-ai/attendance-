@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dragon Runner</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a0a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Courier New', monospace;
+      overflow: hidden;
+    }
+    h1 {
+      color: #ff6b35;
+      font-size: 2rem;
+      margin-bottom: 12px;
+      text-shadow: 0 0 20px #ff6b3588;
+      letter-spacing: 4px;
+    }
+    #gameWrapper {
+      position: relative;
+      border: 2px solid #4a2070;
+      border-radius: 8px;
+      box-shadow: 0 0 40px #6b21a855;
+    }
+    canvas {
+      display: block;
+      border-radius: 6px;
+    }
+    #info {
+      color: #a78bfa;
+      margin-top: 10px;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <h1>&#x1F409; DRAGON RUNNER</h1>
+  <div id="gameWrapper">
+    <canvas id="gameCanvas" width="900" height="300"></canvas>
+  </div>
+  <div id="info">SPACE / TAP to jump &nbsp;|&nbsp; Double-jump allowed &nbsp;|&nbsp; DOWN to duck</div>
+
+  <script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  // ── Colours ──────────────────────────────────────────────────────────────
+  const C = {
+    sky1: '#1a0a2e', sky2: '#2d1b4e',
+    ground: '#4a2070', groundLine: '#6b21a8',
+    dragonBody: '#22c55e', dragonWing: '#16a34a',
+    dragonEye: '#fbbf24', dragonFire: '#f97316',
+    rockA: '#7c3aed', rockB: '#6d28d9',
+    cactusA: '#c026d3', cactusB: '#a21caf',
+    scoreCol: '#e879f9',
+    hiCol: '#fbbf24',
+    cloud: '#3b1f6a',
+    star: '#e9d5ff',
+    flash: 'rgba(255,100,50,0.18)',
+  };
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let state = 'idle'; // idle | running | dead
+  let score = 0, hiScore = 0, frame = 0;
+  let speed = 5, speedTimer = 0;
+
+  // ── Dragon ────────────────────────────────────────────────────────────────
+  const GROUND_Y = H - 60;
+  const dragon = {
+    x: 100, y: GROUND_Y,
+    w: 60, h: 50,
+    vy: 0, jumps: 0,
+    ducking: false,
+    wingAngle: 0,
+    fireFrame: 0,
+    reset() {
+      this.y = GROUND_Y; this.vy = 0; this.jumps = 0;
+      this.ducking = false;
+    },
+    jump() {
+      if (this.jumps < 2) {
+        this.vy = -13; this.jumps++;
+      }
+    },
+    duck(on) { this.ducking = on; },
+    update() {
+      if (this.ducking && this.y >= GROUND_Y) { return; }
+      this.vy += 0.6;
+      this.y += this.vy;
+      if (this.y >= GROUND_Y) {
+        this.y = GROUND_Y; this.vy = 0; this.jumps = 0;
+      }
+      this.wingAngle = Math.sin(frame * 0.18) * 0.5;
+      if (this.fireFrame > 0) this.fireFrame--;
+    },
+    get hitbox() {
+      if (this.ducking && this.y >= GROUND_Y) {
+        return { x: this.x - 4, y: GROUND_Y + 20, w: this.w + 8, h: 20 };
+      }
+      return { x: this.x, y: this.y - this.h + 10, w: this.w - 10, h: this.h - 10 };
+    },
+    draw() {
+      ctx.save();
+      const cx = this.x + this.w / 2;
+      const by = this.ducking && this.y >= GROUND_Y ? GROUND_Y + 40 : this.y;
+      const dh = this.ducking && this.y >= GROUND_Y ? 30 : this.h;
+
+      // fire breath
+      if (this.fireFrame > 0) {
+        const grad = ctx.createLinearGradient(cx + 30, by - dh * 0.5, cx + 80, by - dh * 0.5);
+        grad.addColorStop(0, '#f97316cc');
+        grad.addColorStop(0.5, '#fbbf2499');
+        grad.addColorStop(1, 'transparent');
+        ctx.beginPath();
+        ctx.ellipse(cx + 55, by - dh * 0.5, 30, 10, 0, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+
+      // tail
+      ctx.beginPath();
+      ctx.moveTo(cx - 20, by - dh * 0.3);
+      ctx.quadraticCurveTo(cx - 50, by + 10, cx - 40, by - dh * 0.6);
+      ctx.lineWidth = 8; ctx.strokeStyle = C.dragonWing;
+      ctx.stroke();
+      ctx.lineWidth = 1;
+
+      // body
+      ctx.beginPath();
+      ctx.ellipse(cx, by - dh * 0.4, this.w * 0.4, dh * 0.45, 0, 0, Math.PI * 2);
+      ctx.fillStyle = C.dragonBody; ctx.fill();
+      ctx.strokeStyle = C.dragonWing; ctx.lineWidth = 2; ctx.stroke();
+      ctx.lineWidth = 1;
+
+      // wings (only when airborne or not ducking)
+      if (!this.ducking || this.y < GROUND_Y) {
+        const wa = this.wingAngle;
+        // left wing
+        ctx.beginPath();
+        ctx.moveTo(cx - 10, by - dh * 0.6);
+        ctx.quadraticCurveTo(cx - 40, by - dh * 0.6 - 30 + wa * 20, cx - 25, by - dh * 0.3);
+        ctx.fillStyle = C.dragonWing; ctx.fill();
+        // right wing
+        ctx.beginPath();
+        ctx.moveTo(cx + 10, by - dh * 0.6);
+        ctx.quadraticCurveTo(cx + 40, by - dh * 0.6 - 30 - wa * 20, cx + 25, by - dh * 0.3);
+        ctx.fillStyle = C.dragonWing; ctx.fill();
+      }
+
+      // head
+      ctx.beginPath();
+      ctx.ellipse(cx + 22, by - dh * 0.75, 18, 14, 0.2, 0, Math.PI * 2);
+      ctx.fillStyle = C.dragonBody; ctx.fill();
+      ctx.strokeStyle = C.dragonWing; ctx.lineWidth = 2; ctx.stroke();
+      ctx.lineWidth = 1;
+
+      // snout
+      ctx.beginPath();
+      ctx.ellipse(cx + 36, by - dh * 0.7, 9, 7, 0.3, 0, Math.PI * 2);
+      ctx.fillStyle = '#15803d'; ctx.fill();
+
+      // eye
+      ctx.beginPath();
+      ctx.arc(cx + 28, by - dh * 0.82, 4, 0, Math.PI * 2);
+      ctx.fillStyle = C.dragonEye; ctx.fill();
+      ctx.beginPath();
+      ctx.arc(cx + 29, by - dh * 0.82, 2, 0, Math.PI * 2);
+      ctx.fillStyle = '#000'; ctx.fill();
+
+      // legs
+      if (!this.ducking || this.y < GROUND_Y) {
+        const legSwing = Math.sin(frame * 0.25) * 6;
+        ctx.beginPath();
+        ctx.moveTo(cx - 10, by - 5);
+        ctx.lineTo(cx - 10 + legSwing, by + 10);
+        ctx.moveTo(cx + 10, by - 5);
+        ctx.lineTo(cx + 10 - legSwing, by + 10);
+        ctx.strokeStyle = C.dragonWing; ctx.lineWidth = 5;
+        ctx.lineCap = 'round'; ctx.stroke();
+        ctx.lineWidth = 1; ctx.lineCap = 'butt';
+      }
+
+      ctx.restore();
+    }
+  };
+
+  // ── Obstacles ─────────────────────────────────────────────────────────────
+  const obstacles = [];
+  let obstTimer = 0;
+  let nextObstInterval = 90;
+
+  function spawnObstacle() {
+    const type = Math.random() < 0.4 ? 'bird' : (Math.random() < 0.5 ? 'rock' : 'cactus');
+    if (type === 'bird') {
+      const h = Math.random() < 0.5 ? GROUND_Y - 80 : GROUND_Y - 30;
+      obstacles.push({
+        type: 'bird', x: W + 20,
+        y: h, w: 50, h: 30,
+        wingA: 0,
+      });
+    } else if (type === 'rock') {
+      const sz = 25 + Math.random() * 20;
+      obstacles.push({ type: 'rock', x: W + 20, y: GROUND_Y - sz * 0.5, w: sz * 1.6, h: sz, sz });
+    } else {
+      const num = 1 + Math.floor(Math.random() * 3);
+      obstacles.push({ type: 'cactus', x: W + 20, y: GROUND_Y, w: num * 22, h: 50 + Math.random() * 20, num });
+    }
+  }
+
+  function drawBird(o) {
+    o.wingA = Math.sin(frame * 0.25) * 0.6;
+    ctx.save();
+    ctx.fillStyle = '#c026d3';
+    // body
+    ctx.beginPath();
+    ctx.ellipse(o.x + 25, o.y, 18, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // wings
+    ctx.beginPath();
+    ctx.moveTo(o.x + 15, o.y - 2);
+    ctx.quadraticCurveTo(o.x + 5, o.y - 15 - o.wingA * 15, o.x + 25, o.y - 5);
+    ctx.fillStyle = '#a21caf'; ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(o.x + 35, o.y - 2);
+    ctx.quadraticCurveTo(o.x + 48, o.y - 15 + o.wingA * 15, o.x + 25, o.y - 5);
+    ctx.fillStyle = '#a21caf'; ctx.fill();
+    // eye
+    ctx.beginPath();
+    ctx.arc(o.x + 38, o.y - 2, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#fbbf24'; ctx.fill();
+    ctx.restore();
+  }
+
+  function drawRock(o) {
+    ctx.save();
+    ctx.fillStyle = C.rockA;
+    ctx.beginPath();
+    ctx.moveTo(o.x, o.y + o.h * 0.5);
+    ctx.lineTo(o.x + o.w * 0.15, o.y - o.h * 0.3);
+    ctx.lineTo(o.x + o.w * 0.4, o.y - o.h * 0.5);
+    ctx.lineTo(o.x + o.w * 0.7, o.y - o.h * 0.45);
+    ctx.lineTo(o.x + o.w, o.y + o.h * 0.5);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = C.rockB;
+    ctx.beginPath();
+    ctx.moveTo(o.x + o.w * 0.3, o.y - o.h * 0.1);
+    ctx.lineTo(o.x + o.w * 0.5, o.y - o.h * 0.4);
+    ctx.lineTo(o.x + o.w * 0.65, o.y - o.h * 0.1);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawCactus(o) {
+    ctx.save();
+    const cw = 14, ch = o.h;
+    for (let i = 0; i < o.num; i++) {
+      const bx = o.x + i * 22;
+      ctx.fillStyle = C.cactusA;
+      // main stem
+      ctx.fillRect(bx, o.y - ch, cw, ch);
+      // left arm
+      if (i % 2 === 0) {
+        ctx.fillRect(bx - 10, o.y - ch * 0.65, 10, cw * 0.7);
+        ctx.fillRect(bx - 10, o.y - ch * 0.75, cw * 0.7, 10);
+      }
+      // right arm
+      if (i % 2 !== 1 || o.num > 1) {
+        ctx.fillRect(bx + cw, o.y - ch * 0.5, 10, cw * 0.7);
+        ctx.fillRect(bx + cw + 4, o.y - ch * 0.6, cw * 0.7, 10);
+      }
+    }
+    ctx.restore();
+  }
+
+  function obsHitbox(o) {
+    if (o.type === 'bird') return { x: o.x + 8, y: o.y - 12, w: 34, h: 20 };
+    if (o.type === 'rock') return { x: o.x + 4, y: o.y - o.h * 0.4, w: o.w - 8, h: o.h * 0.9 };
+    return { x: o.x + 2, y: o.y - o.h, w: o.w - 4, h: o.h };
+  }
+
+  function collides(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x &&
+           a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  // ── Stars / Clouds ────────────────────────────────────────────────────────
+  const stars = Array.from({ length: 60 }, () => ({
+    x: Math.random() * W,
+    y: Math.random() * (H - 100),
+    r: Math.random() * 1.5 + 0.3,
+    twinkle: Math.random() * Math.PI * 2,
+  }));
+
+  const clouds = Array.from({ length: 5 }, (_, i) => ({
+    x: i * 200,
+    y: 20 + Math.random() * 60,
+    w: 80 + Math.random() * 60,
+    speed: 0.4 + Math.random() * 0.3,
+  }));
+
+  // ── Particles ─────────────────────────────────────────────────────────────
+  const particles = [];
+  function spawnDeath() {
+    for (let i = 0; i < 20; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const sp = 2 + Math.random() * 4;
+      particles.push({
+        x: dragon.x + dragon.w / 2,
+        y: dragon.y - dragon.h / 2,
+        vx: Math.cos(angle) * sp,
+        vy: Math.sin(angle) * sp,
+        life: 40 + Math.random() * 30,
+        maxLife: 70,
+        r: 3 + Math.random() * 4,
+        color: ['#f97316', '#fbbf24', '#ef4444', '#22c55e'][Math.floor(Math.random() * 4)],
+      });
+    }
+  }
+
+  // ── Ground scrolling ──────────────────────────────────────────────────────
+  let groundOffset = 0;
+
+  // ── Input ─────────────────────────────────────────────────────────────────
+  function handleJump() {
+    if (state === 'idle' || state === 'dead') { startGame(); return; }
+    dragon.jump();
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); handleJump(); }
+    if (e.code === 'ArrowDown') dragon.duck(true);
+  });
+  document.addEventListener('keyup', e => {
+    if (e.code === 'ArrowDown') dragon.duck(false);
+  });
+  canvas.addEventListener('pointerdown', () => handleJump());
+  canvas.addEventListener('pointerup', () => dragon.duck(false));
+
+  // ── Game lifecycle ────────────────────────────────────────────────────────
+  function startGame() {
+    state = 'running';
+    score = 0; frame = 0; speed = 5;
+    speedTimer = 0; obstTimer = 0;
+    nextObstInterval = 90;
+    obstacles.length = 0;
+    particles.length = 0;
+    dragon.reset();
+  }
+
+  function gameOver() {
+    state = 'dead';
+    if (score > hiScore) hiScore = score;
+    dragon.fireFrame = 0;
+    spawnDeath();
+  }
+
+  // ── Draw helpers ──────────────────────────────────────────────────────────
+  function drawBackground() {
+    // sky gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, H - 60);
+    grad.addColorStop(0, C.sky1);
+    grad.addColorStop(1, C.sky2);
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H - 60);
+
+    // stars
+    stars.forEach(s => {
+      s.twinkle += 0.04;
+      const alpha = 0.4 + Math.sin(s.twinkle) * 0.4;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(233,213,255,${alpha})`;
+      ctx.fill();
+    });
+
+    // moon
+    ctx.beginPath();
+    ctx.arc(820, 40, 22, 0, Math.PI * 2);
+    ctx.fillStyle = '#fef3c7'; ctx.fill();
+    ctx.beginPath();
+    ctx.arc(830, 36, 18, 0, Math.PI * 2);
+    ctx.fillStyle = C.sky1; ctx.fill();
+
+    // clouds
+    clouds.forEach(cl => {
+      if (state === 'running') cl.x -= cl.speed * (speed / 5);
+      if (cl.x + cl.w < 0) { cl.x = W + 20; cl.y = 20 + Math.random() * 60; }
+      ctx.fillStyle = C.cloud;
+      ctx.beginPath();
+      ctx.ellipse(cl.x + cl.w * 0.4, cl.y, cl.w * 0.4, 14, 0, 0, Math.PI * 2);
+      ctx.ellipse(cl.x + cl.w * 0.65, cl.y - 5, cl.w * 0.3, 12, 0, 0, Math.PI * 2);
+      ctx.ellipse(cl.x + cl.w * 0.15, cl.y + 2, cl.w * 0.22, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  function drawGround() {
+    ctx.fillStyle = C.ground;
+    ctx.fillRect(0, H - 60, W, 60);
+
+    // scrolling ground line with detail
+    ctx.fillStyle = C.groundLine;
+    ctx.fillRect(0, H - 60, W, 3);
+
+    ctx.strokeStyle = '#7c3aed44';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 30; i++) {
+      const gx = ((i * 40 - groundOffset) % (W + 40) + W + 40) % (W + 40) - 40;
+      ctx.beginPath();
+      ctx.moveTo(gx, H - 58);
+      ctx.lineTo(gx + 15, H - 40);
+      ctx.stroke();
+    }
+    ctx.lineWidth = 1;
+  }
+
+  function drawHUD() {
+    ctx.font = 'bold 18px Courier New';
+    ctx.fillStyle = C.scoreCol;
+    ctx.fillText('SCORE: ' + String(Math.floor(score)).padStart(6, '0'), W - 220, 30);
+    ctx.fillStyle = C.hiCol;
+    ctx.fillText('BEST:  ' + String(Math.floor(hiScore)).padStart(6, '0'), W - 220, 52);
+  }
+
+  function drawIdle() {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(W / 2 - 220, H / 2 - 70, 440, 120);
+    ctx.strokeStyle = '#7c3aed'; ctx.lineWidth = 2;
+    ctx.strokeRect(W / 2 - 220, H / 2 - 70, 440, 120);
+    ctx.lineWidth = 1;
+    ctx.fillStyle = '#e879f9';
+    ctx.font = 'bold 28px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('PRESS SPACE / TAP TO START', W / 2, H / 2 - 20);
+    ctx.fillStyle = '#a78bfa';
+    ctx.font = '16px Courier New';
+    ctx.fillText('Help the dragon avoid obstacles!', W / 2, H / 2 + 15);
+    ctx.fillText('Double-jump  |  Duck with ↓', W / 2, H / 2 + 38);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
+
+  function drawDead() {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(W / 2 - 200, H / 2 - 65, 400, 110);
+    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2;
+    ctx.strokeRect(W / 2 - 200, H / 2 - 65, 400, 110);
+    ctx.lineWidth = 1;
+    ctx.fillStyle = '#ef4444';
+    ctx.font = 'bold 30px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('GAME OVER', W / 2, H / 2 - 18);
+    ctx.fillStyle = C.hiCol;
+    ctx.font = '18px Courier New';
+    ctx.fillText('Score: ' + Math.floor(score) + '  Best: ' + Math.floor(hiScore), W / 2, H / 2 + 12);
+    ctx.fillStyle = '#a78bfa';
+    ctx.font = '15px Courier New';
+    ctx.fillText('PRESS SPACE / TAP to restart', W / 2, H / 2 + 38);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
+
+  // ── Main loop ─────────────────────────────────────────────────────────────
+  function loop() {
+    requestAnimationFrame(loop);
+    ctx.clearRect(0, 0, W, H);
+
+    drawBackground();
+    drawGround();
+
+    if (state === 'running') {
+      frame++;
+      score += 0.1 * (speed / 5);
+
+      // speed up
+      speedTimer++;
+      if (speedTimer > 400) { speed = Math.min(speed + 0.5, 16); speedTimer = 0; }
+
+      // ground scroll
+      groundOffset = (groundOffset + speed) % 40;
+
+      // obstacles
+      obstTimer++;
+      if (obstTimer >= nextObstInterval) {
+        spawnObstacle();
+        obstTimer = 0;
+        nextObstInterval = Math.max(40, 90 - speed * 3 + Math.random() * 30);
+      }
+      obstacles.forEach(o => { o.x -= speed; });
+      // remove off-screen
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        if (obstacles[i].x + obstacles[i].w < -20) obstacles.splice(i, 1);
+      }
+
+      dragon.update();
+
+      // collision
+      const dh = dragon.hitbox;
+      for (const o of obstacles) {
+        if (collides(dh, obsHitbox(o))) { gameOver(); break; }
+      }
+
+      // milestone fire breath
+      if (Math.floor(score) % 100 === 0 && Math.floor(score) > 0 && dragon.fireFrame === 0) {
+        dragon.fireFrame = 15;
+      }
+    }
+
+    // draw obstacles
+    obstacles.forEach(o => {
+      if (o.type === 'bird') drawBird(o);
+      else if (o.type === 'rock') drawRock(o);
+      else drawCactus(o);
+    });
+
+    dragon.draw();
+
+    // particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life--;
+      if (p.life <= 0) { particles.splice(i, 1); continue; }
+      const alpha = p.life / p.maxLife;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * alpha, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = alpha;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    drawHUD();
+
+    if (state === 'idle') drawIdle();
+    if (state === 'dead') drawDead();
+  }
+
+  loop();
+  </script>
+</body>
+</html>
